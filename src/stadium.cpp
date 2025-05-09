@@ -140,7 +140,7 @@ static DWORD codeArray[][CODELEN] = {
     },
 };
 
-#define DATALEN 18
+#define DATALEN 20
 enum {
     NUM_FILES, NUM_STADS, STAD_FIRST, NOU_CAMP_SHIFT_ID, SHIFT, 
     ADBOARD_TEX_FIRST, NUM_ADBOARD_TEX, DELLA_ALPI_ADBOARDS,
@@ -148,6 +148,7 @@ enum {
     STADIUM_TEXT_TABLE, STADIUM_TEXT_LEN, RANDOM_STADIUM_FLAG,
     ISVIEWSTADIUMMODE,
     HOME_CROWD, AWAY_CROWD,
+	TUNNEL_FIRST, TOTAL_TUNNEL,
 };
 static DWORD dtaArray[][DATALEN] = {
 	// PES6
@@ -157,6 +158,7 @@ static DWORD dtaArray[][DATALEN] = {
      0x1131fec, 61, 0x3be6d94,
      0x3a7ce20,
      0x3a7f2ac, 0x3a7f454,
+	 306, 5, 
     },
 	// PES6 1.10
 	{66, 38, 6941, 7611, 4, 
@@ -165,6 +167,7 @@ static DWORD dtaArray[][DATALEN] = {
      0x1132fec, 61, 0x3be7d94,
      0x3a7de20,
      0x3a802ac, 0x3a80454,
+	 306, 5, 
     },
 	// WE2007
 	{66, 38, 7349, 8019, 4, 
@@ -173,6 +176,7 @@ static DWORD dtaArray[][DATALEN] = {
      0x112ca74, 61, 0x3be1814,
      0x3a778a0,
      0x3a79d2c, 0x3a79ed4,
+	 306, 5, 
     },
 };
 
@@ -244,12 +248,16 @@ static char* FILE_NAMES[] = {
     "6_night_snow\\stad2_entrance.bin",
     "6_night_snow\\stad3_adboards.bin",
     "adboards_tex\\default.bin",
+    "tunnel\\tunnel.str",
+	"entrance_mdls\\default.bin",
 };
 
 #define STAD_MAIN(x) (x==8 || x==19 || x==30 || x==41 || x==52 || x==63)
 #define STAD_CROWD_A0(x) (x==0 || x==11 || x==22 || x==33 || x==44 || x==55)
 #define STAD_CROWD_H0(x) (x==4 || x==15 || x==26 || x==37 || x==48 || x==59)
 #define ADBOARDS 66
+#define TUNNEL 67
+#define ENTRANCE 68
 
 static char* WEATHER_NAMES[] = {
 	"Random weather",
@@ -298,6 +306,7 @@ int GetStadId(DWORD id);
 int GetFileId(DWORD id);
 static void InitStadiumMaps();
 static WORD GetTeamId(int which);
+void FindTunnelFile(char* filename);
 void FindAdboardsFile(char* filename);
 void FindStadiumFile(int stadId, DWORD stadFileId, char* filename);
 void stadAfsReplace(GETFILEINFO* gfi);
@@ -678,6 +687,13 @@ void InitStadiumServer()
         // store id in id-map
         g_AFS_idMap[id] = true;
     }
+    
+    // mark ids for adboard textures
+	for (i=0; i<dta[TOTAL_TUNNEL]; i++) {
+        DWORD id = dta[TUNNEL_FIRST] + i;
+        // store id in id-map
+        g_AFS_idMap[id] = true;
+    }
 
     fclose(f);
 
@@ -745,6 +761,43 @@ void FindAdboardsFile(char* filename)
     } else {
         sprintf(filename,"%sGDB\\stadiums\\%s\\%s", 
                 GetPESInfo()->gdbDir, g_stadiumMapIterator->first.c_str(), FILE_NAMES[ADBOARDS]);
+    }
+
+    //sprintf(filename,"%sGDB\\stadiums\\Santiago Bernabeu\\%s", 
+    //        GetPESInfo()->gdbDir, FILE_NAMES[ADBOARDS]);
+    return;
+}
+
+void FindTunnelFile(char* filename)
+{
+	LCM* lcm=(LCM*)dta[TEAM_IDS];
+    // force full stadium reload next time
+    BYTE* randomStad = (BYTE*)dta[RANDOM_STADIUM_FLAG];
+    *randomStad = *randomStad | 0x01;
+
+    if (g_gameChoice || isViewStadiumMode) {
+        return;
+    }
+
+    //if (g_gameChoice && !(isViewStadiumMode && viewGdbStadiums)) {
+    //    return 0; //game choice stadium
+    //}
+
+    //if (g_homeTeamChoice && !(isViewStadiumMode && viewGdbStadiums)) {
+    if (g_homeTeamChoice) {
+        WORD teamId = GetTeamId(HOME);
+        LogWithNumber(&k_stadium, "FindTunnelFile: home team = %d", teamId);
+        std::map<WORD,std::string>::iterator it = g_HomeStadiumMap.find(teamId);
+        if (it !=  g_HomeStadiumMap.end()) {
+            LogWithString(&k_stadium, "FindTunnelFile: has a home stadium: %s", 
+                    (char*)it->second.c_str());
+
+            sprintf(filename,"%sGDB\\stadiums\\%s\\%s", 
+                    GetPESInfo()->gdbDir, (char*)it->second.c_str(), FILE_NAMES[TUNNEL]);
+        }
+    } else {
+        sprintf(filename,"%sGDB\\stadiums\\%s\\%s", 
+                GetPESInfo()->gdbDir, g_stadiumMapIterator->first.c_str(), FILE_NAMES[TUNNEL]);
     }
 
     //sprintf(filename,"%sGDB\\stadiums\\Santiago Bernabeu\\%s", 
@@ -830,10 +883,15 @@ void stadAfsReplace(GETFILEINFO* gfi)
 	fileId = splitFileId(gfi->fileId, &afsId);
 	
 	if (afsId == 1) { // 0_text.afs
+			LogWithTwoNumbers(&k_stadium,"stadAfsReplace: afsId=%d, fileId=%d", afsId, fileId);
         if (MAP_CONTAINS(g_AFS_idMap, fileId)) {
 			LogWithTwoNumbers(&k_stadium,"stadAfsReplace: afsId=%d, fileId=%d", afsId, fileId);
 
-            if (fileId < dta[STAD_FIRST]) {
+            if (fileId >= dta[TUNNEL_FIRST] && fileId < dta[TUNNEL_FIRST] + dta[TOTAL_TUNNEL]) {
+		        // Tunnel
+		        FindTunnelFile(filename);
+                LogWithString(&k_stadium,"OnReadFile: file: %s", FILE_NAMES[TUNNEL]);
+            } else if (fileId < dta[STAD_FIRST]) {
                 // adboard textures
                 if (g_stadId != 0xffffffff) {
                     // we know the stadium id
