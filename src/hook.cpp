@@ -6,6 +6,7 @@
 #include "manage.h"
 #include "hook.h"
 #include "kload.h"
+#include <stdint.h>
 #include "kload_config.h"
 #include "numpages.h"
 #include "input.h"
@@ -1424,7 +1425,7 @@ HRESULT STDMETHODCALLTYPE NewPresent(IDirect3DDevice8* self, CONST RECT* src, CO
         NextCall(self, src, dest, hWnd, unused);
     };
 
-    //KDrawText(0,0,0xffffffff,20,"TEST: äöüÄÖÜßîêéàâáà");
+    //KDrawText(0,0,0xffffffff,20,"TEST: ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
     //Print additional information (labels,...)
     if (l_DrawKitSelectInfo.num>0)
         DrawKitSelectInfo();

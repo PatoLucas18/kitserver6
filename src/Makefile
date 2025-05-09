@@ -45,7 +45,7 @@ all_apps: apps
 #	copy speedtest.exe output
 #	copy vista_test.exe output
 
-dlls: pngdib kload.dll kserv.dll bserv.dll fserv.dll stadium.dll bootserv.dll gloves.dll skins.dll lodmixer.dll dxtools.dll psc.dll clock.dll afs2fs.dll roster.dll speeder.dll
+dlls: pngdib kload.dll kserv.dll bserv.dll fserv.dll stadium.dll bootserv.dll gloves.dll skins.dll lodmixer.dll dxtools.dll psc.dll clock.dll afs2fs.dll roster.dll speeder.dll network.dll
 apps: setup.exe lodcfg.exe keyconf.exe filedec.exe afstest.exe afswalk.exe afsexport.exe # speedtest.exe vista_test.exe
 
 !if "$(debug)"=="1"
@@ -206,6 +206,14 @@ roster.dll: roster.lib roster.res kload.lib
 	$(LINK) $(LFLAGS) /out:roster.dll /DLL roster.obj md5.obj kload.lib d3dx8.lib roster.res $(LIBS)
 roster.obj: roster.cpp roster.h
 md5.obj: md5.c md5.h
+
+network.lib: network.obj
+network.dll: network.lib network.res kload.lib
+	$(LINK) $(LFLAGS) /out:network.dll /DLL network.obj kload.lib network.res $(LIBS)
+network.obj: network.cpp network.h
+
+network.res: 
+	$(RC) -r -fo network.res network.rc
 
 speeder.lib: speeder.obj apihijack.obj
 speeder.dll: speeder.lib speeder.res kload.lib
