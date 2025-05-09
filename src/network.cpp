@@ -132,6 +132,17 @@ public:
 EXTERN_C BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved);
 void initModule();
 bool readConfig(network_config_t& config);
+
+// Save User Online
+void UserOnlineCallPoint();
+void SaveUserOnlineCallPoint();
+
+BYTE* UserData = nullptr;
+char filenameUsedData[2048];
+
+static int read_file_to_mem(char *fn,unsigned char **ppfiledta, int *pfilesize);
+
+
 /*
 size_t HeaderFunction( void *ptr, size_t size, size_t nmemb, void *stream);
 size_t WriteChunkCallback(void *ptr, size_t size, size_t nmemb, void *dta);
@@ -253,6 +264,28 @@ size_t WriteChunkCallback(void *ptr, size_t size, size_t nmemb, void *dta)
 }
 */
 
+KEXPORT void HookCallPoint(DWORD addr, void* func, int codeShift, int numNops, bool addRetn)
+{
+    DWORD target = (DWORD)func + codeShift;
+	if (addr && target)
+	{
+	    BYTE* bptr = (BYTE*)addr;
+	    DWORD protection = 0;
+	    DWORD newProtection = PAGE_EXECUTE_READWRITE;
+	    if (VirtualProtect(bptr, 16, newProtection, &protection)) {
+	        bptr[0] = 0xe8;
+	        DWORD* ptr = (DWORD*)(addr + 1);
+	        ptr[0] = target - (DWORD)(addr + 5);
+            // padding with NOPs
+            for (int i=0; i<numNops; i++) bptr[5+i] = 0x90;
+            if (addRetn)
+                bptr[5+numNops]=0xc3;
+	        TRACE2X(&k_network, "Function (%08x) HOOKED at address (%08x)", target, addr);
+	    }
+	}
+}
+
+
 EXTERN_C BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
 {
 	
@@ -281,9 +314,32 @@ EXTERN_C BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReser
         memcpy(dta, dtaArray[v], sizeof(dta));
 		
 		HookFunction(hk_D3D_Create,(DWORD)initModule);
+
+        if (_config.rememberLogin) {
+            Log(&k_network,"Save User Online Active");
+            // HookCallPoint(0xADA4B7, UserOnlineCallPoint, 6, 0, false); //edited
+            HookCallPoint(0xab9d68, UserOnlineCallPoint, 6, 0, false); //edited
+            
+            HookCallPoint(0xa9b4f8, SaveUserOnlineCallPoint, 6, 2, false); //edited
+        }
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
 	{
+        FILE* file = fopen(filenameUsedData, "wb");  // "wb" = write binary
+        if (file != nullptr) {
+            fwrite(UserData, sizeof(BYTE), 0x60, file);
+            fclose(file);
+            Log(&k_network,"Save User Online...");
+                    
+            // Si ya tiene memoria, liberarla
+            if (UserData != nullptr) {
+                HeapFree(GetProcessHeap(), 0, UserData);
+                UserData = nullptr;
+            }
+        } else {
+            LOG(&k_network,"No se pudo abrir el archivo para escribir.\n");
+        }
+
 		Log(&k_network,"Detaching dll...");
 		Log(&k_network,"Detaching done.");
 	}
@@ -440,6 +496,26 @@ void initModule()
     }
 
     //_login_credentials = dta[CREDENTIALS];
+    
+    if (_config.rememberLogin) {
+        Log(&k_network,"Load User Online");
+        
+        int bannerFileSize=0x60;
+
+        // char fullPath[2048];
+
+        // Leer  save path
+        char* basePath = (char*)0xF867C0;
+        strcpy(filenameUsedData, basePath);
+        strcat(filenameUsedData, "\user_data.bin");
+        LogWithString(&k_network, "Read User Online: %s", filenameUsedData);
+
+        if (read_file_to_mem(filenameUsedData,&UserData,&bannerFileSize) != 0) {
+            LogWithString(&k_network, "Unable read User Online: %s", filenameUsedData);
+            return;
+        }
+    }
+    
 }
 
 /*
@@ -1242,3 +1318,136 @@ void loginWrite()
 }
 
 */
+
+
+
+// Read a file into a memory block.
+static int read_file_to_mem(char *fn,unsigned char **ppfiledta, int *pfilesize) {
+	HANDLE hfile;
+	DWORD fsize;
+	//unsigned char *fbuf;
+	BYTE* fbuf;
+	DWORD bytesread;
+
+	hfile=CreateFile(fn,GENERIC_READ,FILE_SHARE_READ,NULL,
+		OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
+	if(hfile==INVALID_HANDLE_VALUE) return 1;
+
+	fsize=GetFileSize(hfile,NULL);
+	if(fsize>0) {
+		//fbuf=(unsigned char*)GlobalAlloc(GPTR,fsize);
+		//fbuf=(unsigned char*)calloc(fsize,1);
+        fbuf = (BYTE*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, fsize);
+		if(fbuf) {
+			if(ReadFile(hfile,(void*)fbuf,fsize,&bytesread,NULL)) {
+				if(bytesread==fsize) { 
+					(*ppfiledta)  = fbuf;
+					(*pfilesize) = (int)fsize;
+					CloseHandle(hfile);
+					return 0;   // success
+				}
+			}
+			free((void*)fbuf);
+		}
+	}
+	CloseHandle(hfile);
+	return 1;  // error
+};
+
+
+void UserOnline() {
+	LOG(&k_network,"Load User Online textbox");
+    // FUN_00a8eac0
+
+
+    DWORD FlagSavePassword=*(DWORD*)(0x3be6e18);
+    if (FlagSavePassword==0) {       
+        if (UserData != nullptr) {
+            *(BYTE*)(0x3be6e18)= 1;
+            memcpy((BYTE*)(0x3BE6E19), UserData, 0x60);
+            LOG(&k_network, "Contraseña temporal Copiada en %d", 0x3BE6E19);
+        }
+        
+    }
+
+    typedef void FUN_00adaf80(int param_1);
+    FUN_00adaf80* CallFuntion = NULL;
+    CallFuntion = (FUN_00adaf80*)0xadaf80;
+    CallFuntion(0x3b2b554);
+
+    return;
+}
+
+void UserOnlineCallPoint()
+{
+    __asm {
+        pushfd 
+        push ebp
+        push eax
+        push ebx
+        push ecx
+        push edx 
+        push esi
+        push edi
+        call UserOnline
+        pop edi
+        pop esi
+        pop edx
+        pop ecx
+        pop ebx
+        pop eax
+        pop ebp
+        popfd
+        retn
+    }
+}
+
+void SaveUserOnline(DWORD param_1) {
+	LOG(&k_network,"Save User Online update Array");
+    
+    LOG(&k_network,"GUARDAR desde %d", 0x3be6e18);
+    *(BYTE*)(0x3be6e18)=1; //original
+
+
+    // Si ya tiene memoria, liberarla
+    if (UserData != nullptr) {
+        HeapFree(GetProcessHeap(), 0, UserData);
+        UserData = nullptr;
+    }
+
+    // Asignar nueva memoria
+    UserData = (BYTE*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 0x60);
+
+    // Verificar
+    if (UserData) {
+        memcpy(UserData, (BYTE*)0x3be6e19, 0x60);
+        LOG(&k_network,"Memoria asignada correctamente, y array actualizado");
+    } else {
+        LOG(&k_network,"Error al asignar memoria");
+    }
+    return;
+}
+
+void SaveUserOnlineCallPoint()
+{
+    __asm {
+        pushfd 
+        push ebp
+        push eax
+        push ebx
+        push ecx
+        push edx 
+        push esi
+        push edi
+        call SaveUserOnline
+        pop edi
+        pop esi
+        pop edx
+        pop ecx
+        pop ebx
+        pop eax
+        pop ebp
+        popfd
+        retn
+    }
+}

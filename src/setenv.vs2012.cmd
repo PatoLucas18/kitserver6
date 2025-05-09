@@ -1,4 +1,7 @@
 @echo off
 echo Setting kitserver compile environment
-@call "c:\vs11\VC\bin\vcvars32.bat"
+@call "C:\Program Files (x86)\Microsoft Visual Studio 11.0\VC\bin\vcvars32.bat"
 echo Environment set
+nmake
+@echo off
+pause
