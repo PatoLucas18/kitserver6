@@ -33,7 +33,7 @@ int _login_credentials = 0;
 char _cred_key[31] = "djkj93rajf8123bvdfg9475hpok43k";
 */
 
-#define DATALEN 17
+#define DATALEN 23
 enum {
     MAIN_MENU_MODE, CLOCK_FREQUENCY,
     STUN_SERVER, STUN_SERVER_BUFLEN,
@@ -43,6 +43,8 @@ enum {
     DB_FILE5, DB_FILE6, DB_FILE7,
     CODE_READ_VERSION_STRING, CREDENTIALS,
     CODE_READ_CRED_FLAG, CODE_WRITE_CRED_FLAG,
+    Flag_Saved_Password, FUNCTION_LOAD_USER, PARAM_FUN, PATH_SAVE,
+    USER_ONLINE, SAVEUSERONLINE,
 };
 
 static DWORD dtaArray[][DATALEN] = {
@@ -54,6 +56,8 @@ static DWORD dtaArray[][DATALEN] = {
         0,0,0,0,0,0,0,
         0, 0,
         0, 0,
+        0x3be6e18, 0xadaf80, 0x3b2b554, 0xF867C0,
+        0xab9d68, 0xa9b4f8,
     },
     // PES6 1.10
     {
@@ -63,6 +67,8 @@ static DWORD dtaArray[][DATALEN] = {
         0,0,0,0,0,0,0,
         0, 0,
         0, 0,
+        0,0,0,0,
+        0,0,
     },
     // WE2007
     {
@@ -72,6 +78,8 @@ static DWORD dtaArray[][DATALEN] = {
         0,0,0,0,0,0,0,
         0, 0,
         0, 0,
+        0,0,0,0,
+        0,0,
     },
 };
 
@@ -317,10 +325,9 @@ EXTERN_C BOOL WINAPI DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReser
 
         if (_config.rememberLogin) {
             Log(&k_network,"Save User Online Active");
-            // HookCallPoint(0xADA4B7, UserOnlineCallPoint, 6, 0, false); //edited
-            HookCallPoint(0xab9d68, UserOnlineCallPoint, 6, 0, false); //edited
+            HookCallPoint(dta[USER_ONLINE], UserOnlineCallPoint, 6, 0, false); //edited
             
-            HookCallPoint(0xa9b4f8, SaveUserOnlineCallPoint, 6, 2, false); //edited
+            HookCallPoint(dta[SAVEUSERONLINE], SaveUserOnlineCallPoint, 6, 2, false); //edited
         }
 	}
 	else if (dwReason == DLL_PROCESS_DETACH)
@@ -505,7 +512,7 @@ void initModule()
         // char fullPath[2048];
 
         // Leer  save path
-        char* basePath = (char*)0xF867C0;
+        char* basePath = (char*)(dta[PATH_SAVE]);
         strcpy(filenameUsedData, basePath);
         strcat(filenameUsedData, "\user_data.bin");
         LogWithString(&k_network, "Read User Online: %s", filenameUsedData);
@@ -1360,20 +1367,19 @@ void UserOnline() {
     // FUN_00a8eac0
 
 
-    DWORD FlagSavePassword=*(DWORD*)(0x3be6e18);
+    DWORD FlagSavePassword=*(DWORD*)(dta[Flag_Saved_Password]);
     if (FlagSavePassword==0) {       
         if (UserData != nullptr) {
-            *(BYTE*)(0x3be6e18)= 1;
-            memcpy((BYTE*)(0x3BE6E19), UserData, 0x60);
-            LOG(&k_network, "Contraseña temporal Copiada en %d", 0x3BE6E19);
+            *(BYTE*)(dta[Flag_Saved_Password])= 1;
+            memcpy((BYTE*)(dta[Flag_Saved_Password]+1), UserData, 0x60);
+            LOG(&k_network, "Contraseña temporal Copiada en %d", dta[Flag_Saved_Password]+1);
         }
-        
     }
 
     typedef void FUN_00adaf80(int param_1);
     FUN_00adaf80* CallFuntion = NULL;
-    CallFuntion = (FUN_00adaf80*)0xadaf80;
-    CallFuntion(0x3b2b554);
+    CallFuntion = (FUN_00adaf80*)(dta[FUNCTION_LOAD_USER]);
+    CallFuntion(dta[PARAM_FUN]);
 
     return;
 }
@@ -1405,8 +1411,8 @@ void UserOnlineCallPoint()
 void SaveUserOnline(DWORD param_1) {
 	LOG(&k_network,"Save User Online update Array");
     
-    LOG(&k_network,"GUARDAR desde %d", 0x3be6e18);
-    *(BYTE*)(0x3be6e18)=1; //original
+    LOG(&k_network,"GUARDAR desde %d", dta[Flag_Saved_Password]);
+    *(BYTE*)(dta[Flag_Saved_Password])=1; //original
 
 
     // Si ya tiene memoria, liberarla
@@ -1420,7 +1426,7 @@ void SaveUserOnline(DWORD param_1) {
 
     // Verificar
     if (UserData) {
-        memcpy(UserData, (BYTE*)0x3be6e19, 0x60);
+        memcpy(UserData, (BYTE*)(dta[Flag_Saved_Password]+1), 0x60);
         LOG(&k_network,"Memoria asignada correctamente, y array actualizado");
     } else {
         LOG(&k_network,"Error al asignar memoria");
