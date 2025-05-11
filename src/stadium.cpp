@@ -883,7 +883,7 @@ void stadAfsReplace(GETFILEINFO* gfi)
 	fileId = splitFileId(gfi->fileId, &afsId);
 	
 	if (afsId == 1) { // 0_text.afs
-			LogWithTwoNumbers(&k_stadium,"stadAfsReplace: afsId=%d, fileId=%d", afsId, fileId);
+			
         if (MAP_CONTAINS(g_AFS_idMap, fileId)) {
 			LogWithTwoNumbers(&k_stadium,"stadAfsReplace: afsId=%d, fileId=%d", afsId, fileId);
 
