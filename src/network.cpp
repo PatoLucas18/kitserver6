@@ -1370,9 +1370,9 @@ void UserOnline() {
     DWORD FlagSavePassword=*(DWORD*)(dta[FLAG_SAVED_PASSWORD]);
     if (FlagSavePassword==0) {       
         if (UserData != nullptr) {
-            *(BYTE*)(dta[Flag_Saved_Password])= 1;
-            memcpy((BYTE*)(dta[Flag_Saved_Password]+1), UserData, 0x60);
-            LOG(&k_network, "Contraseña temporal Copiada en %d", dta[Flag_Saved_Password]+1);
+            *(BYTE*)(dta[FLAG_SAVED_PASSWORD])= 1;
+            memcpy((BYTE*)(dta[FLAG_SAVED_PASSWORD]+1), UserData, 0x60);
+            LOG(&k_network, "Contraseña temporal Copiada en %d", dta[FLAG_SAVED_PASSWORD]+1);
         }
     }
 
@@ -1411,8 +1411,8 @@ void UserOnlineCallPoint()
 void SaveUserOnline(DWORD param_1) {
 	LOG(&k_network,"Save User Online update Array");
     
-    LOG(&k_network,"GUARDAR desde %d", dta[Flag_Saved_Password]);
-    *(BYTE*)(dta[Flag_Saved_Password])=1; //original
+    LOG(&k_network,"GUARDAR desde %d", dta[FLAG_SAVED_PASSWORD]);
+    *(BYTE*)(dta[FLAG_SAVED_PASSWORD])=1; //original
 
 
     // Si ya tiene memoria, liberarla
@@ -1426,7 +1426,7 @@ void SaveUserOnline(DWORD param_1) {
 
     // Verificar
     if (UserData) {
-        memcpy(UserData, (BYTE*)(dta[Flag_Saved_Password]+1), 0x60);
+        memcpy(UserData, (BYTE*)(dta[FLAG_SAVED_PASSWORD]+1), 0x60);
         LOG(&k_network,"Memoria asignada correctamente, y array actualizado");
     } else {
         LOG(&k_network,"Error al asignar memoria");
