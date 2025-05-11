@@ -43,7 +43,7 @@ enum {
     DB_FILE5, DB_FILE6, DB_FILE7,
     CODE_READ_VERSION_STRING, CREDENTIALS,
     CODE_READ_CRED_FLAG, CODE_WRITE_CRED_FLAG,
-    Flag_Saved_Password, FUNCTION_LOAD_USER, PARAM_FUN, PATH_SAVE,
+    FLAG_SAVED_PASSWORD, FUNCTION_LOAD_USER, PARAM_FUN, PATH_SAVE,
     USER_ONLINE, SAVEUSERONLINE,
 };
 
@@ -1367,7 +1367,7 @@ void UserOnline() {
     // FUN_00a8eac0
 
 
-    DWORD FlagSavePassword=*(DWORD*)(dta[Flag_Saved_Password]);
+    DWORD FlagSavePassword=*(DWORD*)(dta[FLAG_SAVED_PASSWORD]);
     if (FlagSavePassword==0) {       
         if (UserData != nullptr) {
             *(BYTE*)(dta[Flag_Saved_Password])= 1;
