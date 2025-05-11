@@ -1372,7 +1372,7 @@ void UserOnline() {
         if (UserData != nullptr) {
             *(BYTE*)(dta[FLAG_SAVED_PASSWORD])= 1;
             memcpy((BYTE*)(dta[FLAG_SAVED_PASSWORD]+1), UserData, 0x60);
-            LOG(&k_network, "Contraseña temporal Copiada en %d", dta[FLAG_SAVED_PASSWORD]+1);
+            // LOG(&k_network, "Contraseña temporal Copiada en %d", dta[FLAG_SAVED_PASSWORD]+1);
         }
     }
 
