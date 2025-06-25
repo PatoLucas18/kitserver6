@@ -4,4 +4,6 @@ echo Setting kitserver compile environment
 echo Environment set
 nmake
 @echo off
+
+copy "C:\Users\Pato\Documents\GitHub\kitserver6\src\output\stadium.dll" "C:\Games\Pro Evolution Soccer 6\Kitserver\stadium.dll"
 pause
