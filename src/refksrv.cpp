@@ -15,6 +15,8 @@
 #include <string>
 
 KMOD k_refksrv={MODID,NAMELONG,NAMESHORT,DEFAULT_DEBUG};
+DWORD protection;
+DWORD newProtection = PAGE_EXECUTE_READWRITE;
 
 BSERV_CFG bserv_cfg;
 
@@ -130,7 +132,7 @@ IDirect3DTexture8* g_gdbBallTexture;
 #define MAP_FIND(map,key) map[key]
 #define MAP_CONTAINS(map,key) (map.find(key)!=map.end())
 	
-	
+BYTE* mdlFile = nullptr;
 
 static bool g_needsRestore = TRUE;
 static bool g_newBall = false;
@@ -163,6 +165,7 @@ void FreeBalls();
 void SetBall(DWORD id);
 void bservKeyboardProc(int code1, WPARAM wParam, LPARAM lParam);
 void bservBeginUniSelect();
+void LoadRefereeBody();
 void BeginDrawBallLabel();
 void EndDrawBallLabel();
 void DrawBallLabel(IDirect3DDevice8* self);
@@ -628,6 +631,7 @@ void bservKeyboardProc(int code1, WPARAM wParam, LPARAM lParam)
 
 void bservBeginUniSelect()
 {
+	LOG(&k_refksrv,"bservBeginUniSelect()");
 	updateHomeBall();
 	
 	if (autoRandomMode || noHomeBall) {
@@ -638,8 +642,10 @@ void bservBeginUniSelect()
 			SetBall(selectedBall+1);
         }
 	}
+	
 	return;
 }
+
 
 void BeginDrawBallLabel()
 {
@@ -653,7 +659,10 @@ void BeginDrawBallLabel()
 
 void EndDrawBallLabel()
 {
+	LOG(&k_refksrv,"EndDrawBallLabel()");
 	isSelectMode=false;
+	
+	LoadRefereeBody();
 	return;
 };
 
@@ -1137,6 +1146,12 @@ BOOL ReadConfig(BSERV_CFG* config, char* cfgFile)
 		ZeroMemory(name, NULL); 
 		sscanf(pName, "%s", name);
 
+		if (strcmp(name, "debug")==0)
+        {
+			if (sscanf(pValue, "%d", &value)!=1) continue;
+			LogWithNumber(&k_refksrv,"ReadConfig: debug = (%d)", value);
+            k_refksrv.debug = value;
+        }
 		if (lstrcmp(name, "preview")==0)
 		{
 			if (sscanf(pValue, "%d", &value)!=1) continue;
@@ -1332,4 +1347,75 @@ void updateHomeBall()
 }
 
 
+
+void LoadRefereeBody()
+{
+	
+    
+	LOG(&k_refksrv,"LoadRefereeBody()");
+	char buf[2048];
+	BYTE* mdlFileCompr;
+	int mdlFileSizeCompr=0;
+	// BYTE* mdlFile;
+	DWORD mdlFileSize=0;
+
+	sprintf(buf,"%sGDB\\referee kits\\mdl\\%s", GetPESInfo()->gdbDir, model);
+	LogWithString(&k_refksrv,"LoadRefereeBody() Modelo Arbitro: {%s}", buf);
+
+	if (read_file_to_mem(buf,&mdlFileCompr,&mdlFileSizeCompr) != 0) {
+		LogWithString(&k_refksrv, "Unable to read ball model: %s", buf);
+		return;
+	}
+
+	if (mdlFile) {
+        HeapFree(GetProcessHeap(), 0, mdlFile);
+        mdlFile = nullptr;
+    }
+	mdlFileSizeCompr=*(DWORD*)(mdlFileCompr+4);
+	mdlFileSize=*(DWORD*)(mdlFileCompr+8);
+	mdlFile=(BYTE*)HeapAlloc(GetProcessHeap(),HEAP_ZERO_MEMORY,mdlFileSize);
+	
+	int retval = uncompress((UCHAR*)mdlFile,&mdlFileSize,(UCHAR*)(mdlFileCompr+32),mdlFileSizeCompr);
+	if (retval != Z_OK) {
+		LogWithString(&k_refksrv, "Unable to uncompress ball model: %s", buf);
+		HeapFree(GetProcessHeap(), 0, mdlFileCompr);
+		HeapFree(GetProcessHeap(), 0, mdlFile);
+		return;
+	}
+	HeapFree(GetProcessHeap(), 0, mdlFileCompr);
+	// #include <cstddef> // Para std::size_t
+	
+	if (*(DWORD*)(mdlFile)==3) {
+
+		if (VirtualProtect((LPVOID)(0x3A5BE40), 4, newProtection, &protection)) {
+			*(DWORD*)(0x3A5BE40) = (DWORD)(mdlFile);
+		}
+		DWORD startbase=*(DWORD*)(mdlFile+4);
+		if (VirtualProtect((LPVOID)(mdlFile+4), 4, newProtection, &protection)) {
+			*(DWORD*)(mdlFile+4) = (DWORD)(mdlFile)+startbase;
+		}
+		DWORD start1=*(DWORD*)(mdlFile+8);
+		if (VirtualProtect((LPVOID)(mdlFile+8), 4, newProtection, &protection)) {
+			*(DWORD*)(mdlFile+8) = (DWORD)(mdlFile)+start1;
+		}
+		if (VirtualProtect((LPVOID)(0x3a5BE44), 4, newProtection, &protection)) {
+			*(DWORD*)(0x3a5BE44) = (DWORD)(mdlFile)+start1;
+		}
+		DWORD start2=*(DWORD*)(mdlFile+12);
+		if (VirtualProtect((LPVOID)(mdlFile+12), 4, newProtection, &protection)) {
+			*(DWORD*)(mdlFile+12) = (DWORD)(mdlFile)+start2;
+		}
+		if (VirtualProtect((LPVOID)(0x3A5BE48), 4, newProtection, &protection)) {
+			*(DWORD*)(0x3A5BE48) = (DWORD)(mdlFile)+start2;
+		}
+		DWORD start3=*(DWORD*)(mdlFile+16);
+		if (VirtualProtect((LPVOID)(mdlFile+16), 4, newProtection, &protection)) {
+			*(DWORD*)(mdlFile+16) = (DWORD)(mdlFile)+start3;
+		}
+		if (VirtualProtect((LPVOID)(0x3A5BE4C), 4, newProtection, &protection)) {
+			*(DWORD*)(0x3A5BE4C) = (DWORD)(mdlFile)+start3;
+		}
+	}
+	return;
+}
 
